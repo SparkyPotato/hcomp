@@ -1,4 +1,7 @@
-use std::io::{self, Write};
+use std::{
+	fmt::Arguments,
+	io::{self, IoSlice, Write},
+};
 
 use zstd::Encoder;
 
@@ -11,7 +14,7 @@ use crate::{
 };
 
 /// Encode a heightmap. `compression_level` should be between -7 and 22, inclusive.
-pub fn encode(heightmap: Heightmap, compression_level: i8, output: &mut impl Write) -> Result<(), io::Error> {
+pub fn encode(heightmap: Heightmap, compression_level: i8, output: &mut impl Write) -> Result<usize, io::Error> {
 	assert_eq!(
 		heightmap.data.len(),
 		heightmap.width as usize * heightmap.height as usize,
@@ -25,8 +28,35 @@ pub fn encode(heightmap: Heightmap, compression_level: i8, output: &mut impl Wri
 	compress(&stream, compression_level, output)
 }
 
-fn compress(data: &[u8], compression_level: i8, output: &mut impl Write) -> Result<(), io::Error> {
-	let mut encoder = Encoder::new(output, compression_level as _)?;
+fn compress(data: &[u8], compression_level: i8, output: &mut impl Write) -> Result<usize, io::Error> {
+	pub struct WriteWrapper<'a, T> {
+		inner: &'a mut T,
+		bytes_written: usize,
+	}
+
+	impl<'a, T: Write> Write for WriteWrapper<'a, T> {
+		fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+			let res = self.inner.write(buf)?;
+			self.bytes_written += res;
+			Ok(res)
+		}
+
+		fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+			let res = self.inner.write_vectored(bufs)?;
+			self.bytes_written += res;
+			Ok(res)
+		}
+
+		fn flush(&mut self) -> io::Result<()> { self.inner.flush() }
+	}
+
+	let mut encoder = Encoder::new(
+		WriteWrapper {
+			inner: output,
+			bytes_written: 0,
+		},
+		compression_level as _,
+	)?;
 	encoder.set_pledged_src_size(Some(data.len() as u64))?;
 	encoder.include_magicbytes(false)?;
 	encoder.include_checksum(false)?;
@@ -36,7 +66,7 @@ fn compress(data: &[u8], compression_level: i8, output: &mut impl Write) -> Resu
 	encoder.window_log(24)?;
 
 	encoder.write_all(&data)?;
-	encoder.finish()?;
+	let writer = encoder.finish()?;
 
-	Ok(())
+	Ok(writer.bytes_written)
 }
