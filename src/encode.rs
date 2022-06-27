@@ -1,13 +1,10 @@
-use std::{
-	fmt::Arguments,
-	io::{self, IoSlice, Write},
-};
+use std::io::{self, IoSlice, Write};
 
 use zstd::Encoder;
 
 use crate::{
-	byte_compress::byte_compress,
-	palette::transform_palette,
+	byte_compress::{byte_compress, ByteCompressResult},
+	palette::{transform_palette, PaletteResult},
 	prediction::transform_prediction,
 	stream::generate_stream,
 	Heightmap,
@@ -22,9 +19,9 @@ pub fn encode(heightmap: Heightmap, compression_level: i8, output: &mut impl Wri
 	);
 
 	let predicted = transform_prediction(heightmap)?;
-	let paletted = transform_palette(predicted);
-	let byte_compressed = byte_compress(paletted);
-	let stream = generate_stream(byte_compressed);
+	// let paletted = transform_palette(predicted);
+	// let byte_compressed = byte_compress(paletted);
+	let stream = generate_stream(ByteCompressResult::Uncompressed(PaletteResult::Unpalleted(predicted)));
 	compress(&stream, compression_level, output)
 }
 

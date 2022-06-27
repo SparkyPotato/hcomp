@@ -35,7 +35,9 @@ pub fn transform_palette(data: PredictionResult<u16>) -> PaletteResult<u16> {
 
 	let mut map = HashMap::with_capacity(256);
 	map.insert(0, 0);
-	map.insert(sorted[0], 1);
+	if let Some(&x) = sorted.get(0) {
+		map.insert(x, 1);
+	}
 
 	// Delta compress palette.
 	for i in (1..sorted.len()).rev() {
@@ -64,7 +66,7 @@ pub fn decode_palette(data: PaletteResult<u16>) -> PredictionResult<u16> {
 			min_delta,
 			deltas_from_minimum: data
 				.into_iter()
-				.map(|i| if i == 0 { 0 } else { palette[i as usize] })
+				.map(|i| if i == 0 { 0 } else { palette[(i - 1) as usize] })
 				.collect(),
 		},
 	}
