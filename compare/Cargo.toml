@@ -1,0 +1,9 @@
+[package]
+name = "compare"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libwebp-sys = "0.6.0"
+tiff = { git = "https://github.com/image-rs/image-tiff" }
+hcomp = { path = ".." }
