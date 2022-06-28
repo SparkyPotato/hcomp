@@ -26,10 +26,10 @@ pub fn transform_prediction(data: Heightmap) -> Result<PredictionResult<u16>, io
 
 	// Predict (1, 0) and (0, 1).
 	let pred = predict_none(data.data[0]);
-	let delta = data.data[0] as i32 - pred;
+	let delta = data.data[1] as i32 - pred;
 	min_delta = min_delta.min(delta);
 	max_delta = max_delta.max(delta);
-	deltas[0] = delta as i16 as u16; // Truncate, we'll catch the over/underflow later.
+	deltas[0] = delta as i16 as u16; // Truncate, we'll catch the overflow later.
 
 	let delta = data.data[width] as i32 - pred;
 	min_delta = min_delta.min(delta);
@@ -65,7 +65,7 @@ pub fn transform_prediction(data: Heightmap) -> Result<PredictionResult<u16>, io
 	// Predict the sub-image that doesn't include the first row and column.
 	for x in 1..width {
 		for y in 1..height {
-			let left = data.data[y * width + x];
+			let left = data.data[y * width + x - 1];
 			let top = data.data[(y - 1) * width + x];
 			let top_left = data.data[(y - 1) * width + x - 1];
 
@@ -112,19 +112,19 @@ pub fn decode_prediction(mut data: PredictionResult<u16>, width: u32, height: u3
 	let deltas = data.deltas_from_minimum;
 	let mut out = vec![0; width * height];
 	out[0] = data.first;
-	out[1] = (predict_none(out[0]) + deltas[0] as i32) as u16;
-	out[width] = (predict_none(out[0]) + deltas[width - 1] as i32) as u16;
+	out[1] = (predict_none(out[0]) + deltas[0] as i16 as i32) as u16;
+	out[width] = (predict_none(out[0]) + deltas[width - 1] as i16 as i32) as u16;
 	for x in 2..width {
 		let previous = out[x - 1];
 		let previous_previous = out[x - 2];
 		let pred = predict_linear(previous, previous_previous);
-		out[x] = (pred + deltas[x - 1] as i32) as u16;
+		out[x] = (pred + deltas[x - 1] as i16 as i32) as u16;
 	}
 	for y in 2..height {
-		let previous = out[y * width - 1];
-		let previous_previous = out[(y - 1) * width - 1];
+		let previous = out[(y - 1) * width];
+		let previous_previous = out[(y - 2) * width];
 		let pred = predict_linear(previous, previous_previous);
-		out[y * width] = (pred + deltas[y * width - 1] as i32) as u16;
+		out[y * width] = (pred + deltas[y * width - 1] as i16 as i32) as u16;
 	}
 	for x in 1..width {
 		for y in 1..height {
@@ -132,7 +132,7 @@ pub fn decode_prediction(mut data: PredictionResult<u16>, width: u32, height: u3
 			let top = out[(y - 1) * width + x];
 			let top_left = out[(y - 1) * width + x - 1];
 			let pred = predict_plane(left, top, top_left);
-			out[y * width + x] = (pred + deltas[y * width + x - 1] as i32) as u16;
+			out[y * width + x] = (pred + deltas[y * width + x - 1] as i16 as i32) as u16;
 		}
 	}
 
@@ -153,4 +153,45 @@ fn predict_linear(previous: u16, previous_previous: u16) -> i32 {
 fn predict_plane(left: u16, top: u16, top_left: u16) -> i32 {
 	let dhdy = left as i32 - top_left as i32;
 	top as i32 + dhdy
+}
+
+#[cfg(test)]
+mod tests {
+	use std::borrow::Cow;
+
+	use super::*;
+
+	#[test]
+	fn flat() {
+		let values = vec![200; 5 * 5];
+
+		let compressed = transform_prediction(Heightmap {
+			width: 5,
+			height: 5,
+			data: Cow::Borrowed(&values),
+		})
+		.unwrap();
+		assert_eq!(compressed.first, 200);
+		assert_eq!(compressed.min_delta, 0);
+		assert!(compressed.deltas_from_minimum.iter().all(|&x| x == 0));
+
+		let decompressed = decode_prediction(compressed, 5, 5);
+		assert_eq!(decompressed.data, values);
+	}
+
+	#[test]
+	fnrandom() {
+		let values = vec![
+			69, 420, 47, 24, 37, 14, 108, 1645, 29, 74, 36, 197, 978, 1000, 999, 1, 0, 60, 20, 13, 8, 4, 265, 76, 23,
+		];
+
+		let compressed = transform_prediction(Heightmap {
+			width: 5,
+			height: 5,
+			data: Cow::Borrowed(&values),
+		})
+		.unwrap();
+		let decompressed = decode_prediction(compressed, 5, 5);
+		assert_eq!(decompressed.data, values);
+	}
 }

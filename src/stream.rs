@@ -32,7 +32,7 @@ pub fn generate_stream(data: ByteCompressResult) -> Vec<u8> {
 		}) => std::iter::once(first.to_le_bytes())
 			.flatten()
 			.chain(min_delta.to_le_bytes())
-			.chain(Some((palette.len() - 1) as u8))
+			.chain(Some(palette.len() as u8))
 			.chain(palette.into_iter().flat_map(|x| x.to_le_bytes()))
 			.chain(data)
 			.collect(),
@@ -44,7 +44,7 @@ pub fn generate_stream(data: ByteCompressResult) -> Vec<u8> {
 		}) => std::iter::once(first.to_le_bytes())
 			.flatten()
 			.chain(min_delta.to_le_bytes())
-			.chain(Some((palette.len() - 1) as u8))
+			.chain(Some(palette.len() as u8))
 			.chain(palette)
 			.chain(data)
 			.collect(),
@@ -78,7 +78,7 @@ pub fn decode_stream(data: &[u8], pixel_count: usize) -> Result<ByteCompressResu
 			},
 		)))
 	} else {
-		let palette_len = rest[0] as usize + 1;
+		let palette_len = rest[0] as usize;
 		let data_len = pixel_count - 1;
 		let palette_byte_len = rest.len() - data_len - 1;
 		if palette_byte_len == palette_len * 2 {
