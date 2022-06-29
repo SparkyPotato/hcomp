@@ -69,21 +69,27 @@ pub fn transform_prediction(mut data: Vec<u16>, width: u32, height: u32) -> Resu
 	data[width] = delta as i16 as u16; // ^
 
 	// Check for over/underflow.
-	let min_delta: Result<i16, _> = min_delta.try_into();
-	let max_delta: Result<i16, _> = max_delta.try_into();
-	match min_delta {
-		Ok(min_delta) => match max_delta {
-			Ok(_) => {
+	let min_d: Result<i16, _> = min_delta.try_into();
+	match min_d {
+		Ok(min_d) => {
+			if (max_delta - min_delta) as u32 <= u16::MAX as u32 {
 				// Calculate deltas from minimum.
 				for value in data[1..].iter_mut() {
-					*value = (*value as i16 - min_delta) as u16;
+					*value = (*value as i16 - min_d) as u16;
 				}
-				data.push(min_delta as u16);
+				data.push(min_d as u16);
 				Ok(data)
-			},
-			Err(_) => Err(io::Error::new(ErrorKind::InvalidData, "variance too high")),
+			} else {
+				Err(io::Error::new(
+					ErrorKind::InvalidData,
+					format!("variance too high: max delta is {}", max_delta),
+				))
+			}
 		},
-		Err(_) => Err(io::Error::new(ErrorKind::InvalidData, "variance too high")),
+		Err(_) => Err(io::Error::new(
+			ErrorKind::InvalidData,
+			format!("variance too high: min delta is {}", min_delta),
+		)),
 	}
 }
 

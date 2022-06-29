@@ -41,7 +41,7 @@ pub fn transform_palette(data: PredictionResult<u16>) -> PaletteResult<u16> {
 
 	// Delta compress palette.
 	for i in (1..sorted.len()).rev() {
-		map.insert(sorted[i], i as u8);
+		map.insert(sorted[i], (i + 1) as u8);
 		sorted[i] -= sorted[i - 1];
 	}
 
@@ -61,13 +61,78 @@ pub fn decode_palette(data: PaletteResult<u16>) -> PredictionResult<u16> {
 			min_delta,
 			palette,
 			data,
-		} => PredictionResult {
-			first,
-			min_delta,
-			deltas_from_minimum: data
-				.into_iter()
-				.map(|i| if i == 0 { 0 } else { palette[(i - 1) as usize] })
-				.collect(),
+		} => {
+			let mut palette = palette;
+			for i in 1..palette.len() {
+				palette[i] += palette[i - 1];
+			}
+
+			PredictionResult {
+				first,
+				min_delta,
+				deltas_from_minimum: data
+					.into_iter()
+					.map(|i| if i == 0 { 0 } else { palette[(i - 1) as usize] })
+					.collect(),
+			}
 		},
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use std::borrow::Cow;
+
+	use super::*;
+	use crate::{
+		prediction::{decode_prediction, transform_prediction},
+		Heightmap,
+	};
+
+	#[test]
+	fn flat_palette() {
+		let compressed = transform_palette(PredictionResult {
+			first: 200,
+			min_delta: 0,
+			deltas_from_minimum: vec![0; 24],
+		});
+
+		match &compressed {
+			PaletteResult::Unpalleted(_) => panic!("Expected palette"),
+			PaletteResult::Palleted {
+				first,
+				min_delta,
+				palette,
+				data,
+			} => {
+				assert_eq!(*first, 200);
+				assert_eq!(*min_delta, 0);
+				assert_eq!(palette, &[]);
+				assert_eq!(data, &[0; 24]);
+			},
+		}
+
+		let decompressed = decode_palette(compressed);
+		assert_eq!(decompressed.first, 200);
+		assert_eq!(decompressed.min_delta, 0);
+		assert_eq!(decompressed.deltas_from_minimum, vec![0; 24]);
+	}
+
+	#[test]
+	fn random_palette() {
+		let values = vec![
+			69, 420, 47, 24, 37, 14, 108, 1645, 29, 74, 36, 197, 978, 1000, 999, 1, 0, 60, 20, 13, 8, 4, 265, 76, 23,
+		];
+
+		let compressed = transform_prediction(Heightmap {
+			width: 5,
+			height: 5,
+			data: Cow::Borrowed(&values),
+		})
+		.unwrap();
+		let compressed = transform_palette(compressed);
+		let decompressed = decode_palette(compressed);
+		let decompressed = decode_prediction(decompressed, 5, 5);
+		assert_eq!(decompressed.data, values);
 	}
 }
