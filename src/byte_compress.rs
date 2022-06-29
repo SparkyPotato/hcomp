@@ -1,78 +1,36 @@
-use crate::{palette::PaletteResult, prediction::PredictionResult};
-
-pub enum ByteCompressResult {
-	Compressed(PaletteResult<u8>),
-	Uncompressed(PaletteResult<u16>),
+pub fn u16_slice_to_u8_slice(slice: &[u16]) -> &[u8] {
+	unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() * 2) }
 }
 
-pub fn byte_compress(data: PaletteResult<u16>) -> ByteCompressResult {
-	match data {
-		PaletteResult::Unpalleted(data) => {
-			let mut max_delta = 0;
-			for &delta in data.deltas_from_minimum.iter() {
-				max_delta = max_delta.max(delta);
-			}
-			if max_delta <= u8::MAX as u16 {
-				ByteCompressResult::Compressed(PaletteResult::Unpalleted(PredictionResult {
-					first: data.first,
-					min_delta: data.min_delta,
-					deltas_from_minimum: data.deltas_from_minimum.iter().map(|&delta| delta as u8).collect(),
-				}))
-			} else {
-				ByteCompressResult::Uncompressed(PaletteResult::Unpalleted(data))
-			}
-		},
-		PaletteResult::Palleted {
-			first,
-			min_delta,
-			palette,
-			data,
-		} => {
-			let mut max_delta = 0;
-			for &delta in palette.iter() {
-				max_delta = max_delta.max(delta);
-			}
-			if max_delta <= u8::MAX as u16 {
-				ByteCompressResult::Compressed(PaletteResult::Palleted {
-					first,
-					min_delta,
-					palette: palette.iter().map(|&delta| delta as u8).collect(),
-					data,
-				})
-			} else {
-				ByteCompressResult::Uncompressed(PaletteResult::Palleted {
-					first,
-					min_delta,
-					palette,
-					data,
-				})
-			}
-		},
+pub fn u16_slice_to_u8_slice_mut(slice: &mut [u16]) -> &mut [u8] {
+	unsafe { std::slice::from_raw_parts_mut(slice.as_mut_ptr() as *mut u8, slice.len() * 2) }
+}
+
+/// Compresses a slice of u16s into a slice of u8s, in place. Returns if the slice was compressed.
+pub fn byte_compress(data: &mut [u16]) -> bool {
+	let max_value = data.iter().copied().max().unwrap();
+	if max_value <= u8::MAX as u16 {
+		let len = data.len();
+		let data = u16_slice_to_u8_slice_mut(data);
+
+		#[cfg(target_endian = "little")]
+		for i in 1..len {
+			data[i] = data[i * 2];
+		}
+
+		#[cfg(target_endian = "big")]
+		for i in 0..len {
+			data[i] = data[i * 2 + 1];
+		}
+
+		true
+	} else {
+		false
 	}
 }
 
-pub fn decode_byte_compress(data: ByteCompressResult) -> PaletteResult<u16> {
-	match data {
-		ByteCompressResult::Uncompressed(data) => data,
-		ByteCompressResult::Compressed(PaletteResult::Unpalleted(PredictionResult {
-			first,
-			min_delta,
-			deltas_from_minimum,
-		})) => PaletteResult::Unpalleted(PredictionResult {
-			first,
-			min_delta,
-			deltas_from_minimum: deltas_from_minimum.into_iter().map(|x| x as u16).collect(),
-		}),
-		ByteCompressResult::Compressed(PaletteResult::Palleted {
-			first,
-			min_delta,
-			palette,
-			data,
-		}) => PaletteResult::Palleted {
-			first,
-			min_delta,
-			palette: palette.into_iter().map(|x| x as u16).collect(),
-			data,
-		},
+pub fn byte_decompress(input: &[u8], out: &mut [u16]) {
+	for (o, &i) in out.iter_mut().zip(input.iter()) {
+		*o = i as _;
 	}
 }

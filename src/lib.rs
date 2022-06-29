@@ -2,13 +2,12 @@
 
 use std::borrow::Cow;
 
-// pub mod decode;
-// pub mod encode;
+pub mod decode;
+pub mod encode;
 
-// mod byte_compress;
-// mod palette;
+mod byte_compress;
+mod palette;
 mod prediction;
-// mod stream;
 
 /// A heightmap image.
 ///
@@ -21,7 +20,7 @@ pub struct Heightmap<'a> {
 	pub data: Cow<'a, [u16]>,
 }
 
-#[cfg(never)]
+#[cfg(test)]
 mod tests {
 	use std::borrow::Cow;
 
@@ -52,12 +51,16 @@ mod tests {
 		];
 
 		let mut output = Vec::new();
-		encode(Heightmap {
-			width: 5,
-			height: 5,
-			data: Cow::Borrowed(&values),
-		}, 22, &mut output)
-			.unwrap();
+		encode(
+			Heightmap {
+				width: 5,
+				height: 5,
+				data: Cow::Borrowed(&values),
+			},
+			22,
+			&mut output,
+		)
+		.unwrap();
 		let (decompressed, _) = decode(&output, 5, 5).unwrap();
 		assert_eq!(decompressed.data, values);
 	}

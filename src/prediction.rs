@@ -3,9 +3,9 @@ use std::{io, io::ErrorKind};
 use crate::Heightmap;
 
 /// Transform the image into deltas from predictions.
-/// * `[0]`: first value in the heightmap
-/// * `[1..]`: deltas from prediction - min_delta for the rest of the pixels.
-/// * `[last]`: minimum delta from a prediction.
+/// * `[0]`: first value in the heightmap.
+/// * `[1]`: minimum delta from a prediction.
+/// * `[2..]`: deltas from prediction - min_delta for the rest of the pixels.
 pub fn transform_prediction(mut data: Vec<u16>, width: u32, height: u32) -> Result<Vec<u16>, io::Error> {
 	let width = width as usize;
 	let height = height as usize;
@@ -74,10 +74,11 @@ pub fn transform_prediction(mut data: Vec<u16>, width: u32, height: u32) -> Resu
 		Ok(min_d) => {
 			if (max_delta - min_delta) as u32 <= u16::MAX as u32 {
 				// Calculate deltas from minimum.
-				for value in data[1..].iter_mut() {
-					*value = (*value as i16 - min_d) as u16;
+				data.push(0);
+				for i in (1..data.len() - 1).rev() {
+					data[i + 1] = (data[i] as i16 - min_d) as u16;
 				}
-				data.push(min_d as u16);
+				data[1] = min_d as u16;
 				Ok(data)
 			} else {
 				Err(io::Error::new(
@@ -97,10 +98,11 @@ pub fn decode_prediction(mut data: Vec<u16>, width: u32, height: u32) -> Heightm
 	let width = width as usize;
 	let height = height as usize;
 
-	let min_delta = data.pop().unwrap() as i16;
-	for i in data[1..].iter_mut() {
-		*i = (*i as i16 + min_delta) as u16;
+	let min_delta = data[1] as i16;
+	for i in 2..data.len() {
+		data[i - 1] = (data[i] as i16 + min_delta) as u16;
 	}
+	data.truncate(data.len() - 1);
 
 	data[1] = (predict_none(data[0]) + data[1] as i16 as i32) as u16;
 	data[width] = (predict_none(data[0]) + data[width] as i16 as i32) as u16;

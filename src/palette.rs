@@ -1,85 +1,63 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-use crate::prediction::PredictionResult;
+use crate::byte_compress::{u16_slice_to_u8_slice, u16_slice_to_u8_slice_mut};
 
-/// Result after generating global palettes.
-pub enum PaletteResult<T> {
-	/// No palette was generated. The input is returned unmodified.
-	Unpalleted(PredictionResult<T>),
-	/// A palette was generated.
-	/// * `first`: The value of the first pixel, since it is not stored in the palette.
-	/// * `min_delta`: The minimum delta between the prediction and actual value.
-	/// * `palette`: Sorted delta-compressed palette of deltas, not including the minimum value.
-	/// * `data`: Indices into the palette for each pixel after the first one. (0 signifies `min_delta`).
-	Palleted {
-		first: u16,
-		min_delta: i16,
-		palette: Vec<T>,
-		data: Vec<u8>,
-	},
-}
+pub fn transform_palette(data: &mut [u16]) -> Option<usize> {
+	// Paletting is not worth it.
+	if data.len() <= 512 {
+		return None;
+	}
 
-pub fn transform_palette(data: PredictionResult<u16>) -> PaletteResult<u16> {
-	let mut uniques = HashSet::with_capacity(256);
-	for &delta in data.deltas_from_minimum.iter() {
-		if delta != 0 {
-			uniques.insert(delta);
-			if uniques.len() > 255 {
-				return PaletteResult::Unpalleted(data);
+	let mut map = HashMap::with_capacity(256);
+	for &value in data.iter() {
+		if value != 0 {
+			map.insert(value, 0);
+			if map.len() > 255 {
+				return None;
 			}
 		}
 	}
 
-	let mut sorted: Vec<_> = uniques.into_iter().collect();
-	sorted.sort_unstable();
-
-	let mut map = HashMap::with_capacity(256);
-	map.insert(0, 0);
-	if let Some(&x) = sorted.get(0) {
-		map.insert(x, 1);
+	// Don't have enough space to fit the palette.
+	let offset = 1 + map.len();
+	if offset > data.len() {
+		return None;
 	}
 
+	let mut sorted: Vec<u16> = map.iter().map(|(&x, _)| x).collect();
+	sorted.sort_unstable();
+
+	let len = data.len();
+	let data = u16_slice_to_u8_slice_mut(data);
+
+	map.insert(0, 0);
+	if let Some(index) = sorted.get(0) {
+		*map.get_mut(index).unwrap() = 0;
+	}
 	// Delta compress palette.
 	for i in (1..sorted.len()).rev() {
-		map.insert(sorted[i], (i + 1) as u8);
+		*map.get_mut(&sorted[i]).unwrap() = (i + 1) as u8;
 		sorted[i] -= sorted[i - 1];
 	}
 
-	PaletteResult::Palleted {
-		first: data.first,
-		min_delta: data.min_delta,
-		palette: sorted,
-		data: data.deltas_from_minimum.iter().map(|delta| map[delta]).collect(),
+	let palette = sorted;
+
+	for i in (0..len).rev() {
+		let value = u16::from_le_bytes(data[2 * i..2 * i + 2].try_into().unwrap());
+		data[len + i] = map[&value];
 	}
+
+	data[..offset].copy_from_slice(u16_slice_to_u8_slice(&palette));
+	unsafe {
+		std::ptr::copy(data[len..].as_ptr(), data[offset..].as_ptr() as _, len);
+	}
+
+	Some(offset + len)
 }
 
-pub fn decode_palette(data: PaletteResult<u16>) -> PredictionResult<u16> {
-	match data {
-		PaletteResult::Unpalleted(data) => data,
-		PaletteResult::Palleted {
-			first,
-			min_delta,
-			palette,
-			data,
-		} => {
-			let mut palette = palette;
-			for i in 1..palette.len() {
-				palette[i] += palette[i - 1];
-			}
+pub fn decode_palette() {}
 
-			PredictionResult {
-				first,
-				min_delta,
-				deltas_from_minimum: data
-					.into_iter()
-					.map(|i| if i == 0 { 0 } else { palette[(i - 1) as usize] })
-					.collect(),
-			}
-		},
-	}
-}
-
-#[cfg(test)]
+#[cfg(never)]
 mod tests {
 	use std::borrow::Cow;
 

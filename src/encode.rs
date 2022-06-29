@@ -3,26 +3,44 @@ use std::io::{self, IoSlice, Write};
 use zstd::Encoder;
 
 use crate::{
-	// byte_compress::byte_compress,
-	// palette::transform_palette,
+	byte_compress::{byte_compress, u16_slice_to_u8_slice, u16_slice_to_u8_slice_mut},
+	palette::transform_palette,
 	prediction::transform_prediction,
-	// stream::generate_stream,
 	Heightmap,
 };
 
 /// Encode a heightmap. `compression_level` should be between -7 and 22, inclusive.
 pub fn encode(heightmap: Heightmap, compression_level: i8, output: &mut impl Write) -> Result<usize, io::Error> {
+	assert!(
+		heightmap.width > 2 && heightmap.height > 2,
+		"Heightmap must be at least 3x3"
+	);
 	assert_eq!(
 		heightmap.data.len(),
 		heightmap.width as usize * heightmap.height as usize,
 		"heightmap data length must be equal to width * height"
 	);
 
-	let predicted = transform_prediction(heightmap.data.into(), heightmap.width, heightmap.height)?;
-	let paletted = transform_palette(predicted);
-	let byte_compressed = byte_compress(paletted);
-	let stream = generate_stream(byte_compressed);
-	compress(&stream, compression_level, output)
+	let mut predicted = transform_prediction(heightmap.data.into(), heightmap.width, heightmap.height)?;
+
+	let count = predicted.len() - 2;
+	let deltas = &mut predicted[2..];
+	let len = if byte_compress(deltas) {
+		4 + count
+	} else {
+		match transform_palette(deltas) {
+			Some(len) => {
+				let palette_size = len - count - 1;
+				if byte_compress(&mut deltas[1..palette_size + 1]) {
+					4 + len - palette_size / 2
+				} else {
+					4 + len
+				}
+			},
+			None => predicted.len() * 2,
+		}
+	};
+	compress(&u16_slice_to_u8_slice(&predicted)[..len], compression_level, output)
 }
 
 fn compress(data: &[u8], compression_level: i8, output: &mut impl Write) -> Result<usize, io::Error> {
