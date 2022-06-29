@@ -3,10 +3,10 @@ use std::io::{self, IoSlice, Write};
 use zstd::Encoder;
 
 use crate::{
-	byte_compress::byte_compress,
-	palette::transform_palette,
+	// byte_compress::byte_compress,
+	// palette::transform_palette,
 	prediction::transform_prediction,
-	stream::generate_stream,
+	// stream::generate_stream,
 	Heightmap,
 };
 
@@ -18,7 +18,7 @@ pub fn encode(heightmap: Heightmap, compression_level: i8, output: &mut impl Wri
 		"heightmap data length must be equal to width * height"
 	);
 
-	let predicted = transform_prediction(heightmap)?;
+	let predicted = transform_prediction(heightmap.data.into(), heightmap.width, heightmap.height)?;
 	let paletted = transform_palette(predicted);
 	let byte_compressed = byte_compress(paletted);
 	let stream = generate_stream(byte_compressed);

@@ -2,13 +2,13 @@
 
 use std::borrow::Cow;
 
-pub mod decode;
-pub mod encode;
+// pub mod decode;
+// pub mod encode;
 
-mod byte_compress;
-mod palette;
+// mod byte_compress;
+// mod palette;
 mod prediction;
-mod stream;
+// mod stream;
 
 /// A heightmap image.
 ///
@@ -21,7 +21,7 @@ pub struct Heightmap<'a> {
 	pub data: Cow<'a, [u16]>,
 }
 
-#[cfg(test)]
+#[cfg(never)]
 mod tests {
 	use std::borrow::Cow;
 
