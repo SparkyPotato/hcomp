@@ -2,14 +2,15 @@ use std::collections::HashMap;
 
 use crate::byte_compress::{u16_slice_to_u8_slice, u16_slice_to_u8_slice_mut};
 
-pub fn transform_palette(data: &mut [u16]) -> Option<usize> {
+pub fn transform_palette(data: &mut [u8]) -> Option<usize> {
 	// Paletting is not worth it.
 	if data.len() <= 512 {
 		return None;
 	}
 
 	let mut map = HashMap::with_capacity(256);
-	for &value in data.iter() {
+	for value in data.chunks_exact(2) {
+		let value = u16::from_ne_bytes(value.try_into().unwrap());
 		if value != 0 {
 			map.insert(value, 0);
 			if map.len() > 255 {
@@ -18,17 +19,15 @@ pub fn transform_palette(data: &mut [u16]) -> Option<usize> {
 		}
 	}
 
+	let data_offset = 1 + map.len() * 2;
+	let data_len = data.len() / 2;
 	// Don't have enough space to fit the palette.
-	let offset = 1 + map.len();
-	if offset > data.len() {
+	if data_offset > data_len {
 		return None;
 	}
 
 	let mut sorted: Vec<u16> = map.iter().map(|(&x, _)| x).collect();
 	sorted.sort_unstable();
-
-	let len = data.len();
-	let data = u16_slice_to_u8_slice_mut(data);
 
 	map.insert(0, 0);
 	if let Some(index) = sorted.get(0) {
@@ -42,17 +41,18 @@ pub fn transform_palette(data: &mut [u16]) -> Option<usize> {
 
 	let palette = sorted;
 
-	for i in (0..len).rev() {
-		let value = u16::from_le_bytes(data[2 * i..2 * i + 2].try_into().unwrap());
-		data[len + i] = map[&value];
+	for i in (0..data_len).rev() {
+		let value = u16::from_ne_bytes(data[2 * i..2 * i + 2].try_into().unwrap());
+		data[data_len + i] = map[&value];
 	}
 
-	data[..offset].copy_from_slice(u16_slice_to_u8_slice(&palette));
+	data[0] = palette.len() as _;
+	data[1..data_offset].copy_from_slice(u16_slice_to_u8_slice(&palette));
 	unsafe {
-		std::ptr::copy(data[len..].as_ptr(), data[offset..].as_ptr() as _, len);
+		std::ptr::copy(data[data_len..].as_ptr(), data[data_offset..].as_ptr() as _, data_len);
 	}
 
-	Some(offset + len)
+	Some(data_offset + data_len)
 }
 
 pub fn decode_palette() {}

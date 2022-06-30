@@ -22,25 +22,34 @@ pub fn encode(heightmap: Heightmap, compression_level: i8, output: &mut impl Wri
 	);
 
 	let mut predicted = transform_prediction(heightmap.data.into(), heightmap.width, heightmap.height)?;
+	let delta_count = predicted.len() - 2;
+	let bytes = u16_slice_to_u8_slice_mut(&mut predicted);
+	let deltas = &mut bytes[4..];
 
-	let count = predicted.len() - 2;
-	let deltas = &mut predicted[2..];
 	let len = if byte_compress(deltas) {
-		4 + count
+		delta_count
 	} else {
 		match transform_palette(deltas) {
 			Some(len) => {
-				let palette_size = len - count - 1;
-				if byte_compress(&mut deltas[1..palette_size + 1]) {
-					4 + len - palette_size / 2
+				let data_offset = len - delta_count;
+				if byte_compress(&mut deltas[1..data_offset]) {
+					unsafe {
+						let palette_count = (data_offset - 1) / 2;
+						std::ptr::copy(
+							deltas[data_offset..].as_ptr(),
+							deltas[1 + palette_count..].as_mut_ptr(),
+							delta_count,
+						);
+						1 + palette_count + delta_count
+					}
 				} else {
-					4 + len
+					len
 				}
 			},
-			None => predicted.len() * 2,
+			None => deltas.len(),
 		}
 	};
-	compress(&u16_slice_to_u8_slice(&predicted)[..len], compression_level, output)
+	compress(&bytes[..4 + len], compression_level, output)
 }
 
 fn compress(data: &[u8], compression_level: i8, output: &mut impl Write) -> Result<usize, io::Error> {
