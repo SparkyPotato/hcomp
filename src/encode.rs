@@ -3,7 +3,7 @@ use std::io::{self, IoSlice, Write};
 use zstd::Encoder;
 
 use crate::{
-	byte_compress::{byte_compress, u16_slice_to_u8_slice, u16_slice_to_u8_slice_mut},
+	byte_compress::{byte_compress, u16_slice_to_u8_slice_mut},
 	palette::transform_palette,
 	prediction::transform_prediction,
 	Heightmap,
@@ -29,25 +29,26 @@ pub fn encode(heightmap: Heightmap, compression_level: i8, output: &mut impl Wri
 	let len = if byte_compress(deltas) {
 		delta_count
 	} else {
-		match transform_palette(deltas) {
-			Some(len) => {
-				let data_offset = len - delta_count;
-				if byte_compress(&mut deltas[1..data_offset]) {
-					unsafe {
-						let palette_count = (data_offset - 1) / 2;
-						std::ptr::copy(
-							deltas[data_offset..].as_ptr(),
-							deltas[1 + palette_count..].as_mut_ptr(),
-							delta_count,
-						);
-						1 + palette_count + delta_count
-					}
-				} else {
-					len
-				}
-			},
-			None => deltas.len(),
-		}
+		// match transform_palette(deltas) {
+		// 	Some(len) => {
+		// 		let data_offset = len - delta_count;
+		// 		if byte_compress(&mut deltas[1..data_offset]) {
+		// 			unsafe {
+		// 				let palette_count = (data_offset - 1) / 2;
+		// 				std::ptr::copy(
+		// 					deltas[data_offset..].as_ptr(),
+		// 					deltas[1 + palette_count..].as_mut_ptr(),
+		// 					delta_count,
+		// 				);
+		// 				1 + palette_count + delta_count
+		// 			}
+		// 		} else {
+		// 			len
+		// 		}
+		// 	},
+		// 	None => deltas.len(),
+		// }
+		deltas.len()
 	};
 	compress(&bytes[..4 + len], compression_level, output)
 }

@@ -9,6 +9,7 @@ use crate::Heightmap;
 pub fn transform_prediction(mut data: Vec<u16>, width: u32, height: u32) -> Result<Vec<u16>, io::Error> {
 	let width = width as usize;
 	let height = height as usize;
+	assert_eq!(data.len(), width * height);
 
 	let mut min_delta = i32::MAX;
 	let mut max_delta = i32::MIN;
@@ -97,6 +98,7 @@ pub fn transform_prediction(mut data: Vec<u16>, width: u32, height: u32) -> Resu
 pub fn decode_prediction(mut data: Vec<u16>, width: u32, height: u32) -> Heightmap<'static> {
 	let width = width as usize;
 	let height = height as usize;
+	assert_eq!(data.len(), width * height + 1);
 
 	let min_delta = data[1] as i16;
 	for i in 2..data.len() {
