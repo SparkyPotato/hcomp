@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::byte_compress::{u16_slice_to_u8_slice, u16_slice_to_u8_slice_mut};
+use crate::byte_compress::{u16_slice_to_u8_slice};
 
 pub fn transform_palette(data: &mut [u8]) -> Option<usize> {
 	// Paletting is not worth it.
@@ -55,7 +55,28 @@ pub fn transform_palette(data: &mut [u8]) -> Option<usize> {
 	Some(data_offset + data_len)
 }
 
-pub fn decode_palette() {}
+pub fn decode_palette(input: &mut [u8], out: &mut [u8]) {
+	let len = input[0] as usize;
+	let palette = &mut input[1..len * 2];
+
+	for i in 1..len {
+		let prev = u16::from_le_bytes(palette[(i - 1) * 2.. i * 2].try_into().unwrap());
+		let curr = u16::from_le_bytes(palette[i * 2..(i + 1) * 2].try_into().unwrap());
+		palette[i * 2..(i + 1) * 2].copy_from_slice(&(prev + curr).to_le_bytes());
+	}
+
+	let palette = &input[1..len * 2];
+
+	let data = &input[1 + len * 2..];
+	for (i, &h) in data.iter().enumerate() {
+		let h = h as usize;
+		out[i * 2..(i + 1) * 2].copy_from_slice(if h != 0 {
+			&palette[2 * h..2 * h + 1]
+		} else {
+			&[0, 0]
+		});
+	}
+}
 
 #[cfg(never)]
 mod tests {

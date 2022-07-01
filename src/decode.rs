@@ -8,7 +8,7 @@ use crate::byte_compress::u16_slice_to_u8_slice_mut;
 pub fn decode(data: &[u8], width: u32, height: u32) -> Result<(Heightmap, usize), io::Error> {
 	let pixel_count = width as usize * height as usize;
 
-	let (data, len) = decompress(data, pixel_count)?;
+	let (mut data, len) = decompress(data, pixel_count)?;
 
 	let u16_size = pixel_count * 2 + 2;
 	let u8_size = pixel_count + 3;
@@ -27,7 +27,16 @@ pub fn decode(data: &[u8], width: u32, height: u32) -> Result<(Heightmap, usize)
 			decode_prediction(out, width, height)
 		}
 	} else {
-		return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid data length"));
+		let palette_len = data[5] as usize;
+		if data.len() == 5 + palette_len * 2 + pixel_count {
+			unsafe {
+				std::ptr::copy_nonoverlapping(data.as_ptr(), out.as_mut_ptr() as _, 4);
+				decode_palette(&mut data[4..], u16_slice_to_u8_slice_mut(&mut out[2..]));
+				decode_prediction(out, width, height)
+			}
+		} else {
+			return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid data length"));
+		}
 	};
 
 	Ok((ret, len))
