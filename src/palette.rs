@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::byte_compress::{u16_slice_to_u8_slice};
+use crate::byte_compress::u16_slice_to_u8_slice;
 
 pub fn transform_palette(data: &mut [u8]) -> Option<usize> {
 	// Paletting is not worth it.
@@ -31,7 +31,7 @@ pub fn transform_palette(data: &mut [u8]) -> Option<usize> {
 
 	map.insert(0, 0);
 	if let Some(index) = sorted.get(0) {
-		*map.get_mut(index).unwrap() = 0;
+		*map.get_mut(index).unwrap() = 1;
 	}
 	// Delta compress palette.
 	for i in (1..sorted.len()).rev() {
@@ -57,81 +57,62 @@ pub fn transform_palette(data: &mut [u8]) -> Option<usize> {
 
 pub fn decode_palette(input: &mut [u8], out: &mut [u8]) {
 	let len = input[0] as usize;
-	let palette = &mut input[1..len * 2];
+	let palette = &mut input[1..1 + len * 2];
 
 	for i in 1..len {
-		let prev = u16::from_le_bytes(palette[(i - 1) * 2.. i * 2].try_into().unwrap());
+		let prev = u16::from_le_bytes(palette[(i - 1) * 2..i * 2].try_into().unwrap());
 		let curr = u16::from_le_bytes(palette[i * 2..(i + 1) * 2].try_into().unwrap());
 		palette[i * 2..(i + 1) * 2].copy_from_slice(&(prev + curr).to_le_bytes());
 	}
 
-	let palette = &input[1..len * 2];
+	let palette = &input[1..1 + len * 2];
 
 	let data = &input[1 + len * 2..];
 	for (i, &h) in data.iter().enumerate() {
 		let h = h as usize;
-		out[i * 2..(i + 1) * 2].copy_from_slice(if h != 0 {
-			&palette[2 * h..2 * h + 1]
-		} else {
-			&[0, 0]
-		});
+		out[i * 2..(i + 1) * 2].copy_from_slice(if h != 0 { &palette[(h - 1) * 2..h * 2] } else { &[0, 0] });
 	}
 }
 
-#[cfg(never)]
+#[cfg(test)]
 mod tests {
-	use std::borrow::Cow;
-
 	use super::*;
-	use crate::{
-		prediction::{decode_prediction, transform_prediction},
-		Heightmap,
-	};
 
 	#[test]
 	fn flat_palette() {
-		let compressed = transform_palette(PredictionResult {
-			first: 200,
-			min_delta: 0,
-			deltas_from_minimum: vec![0; 24],
-		});
-
-		match &compressed {
-			PaletteResult::Unpalleted(_) => panic!("Expected palette"),
-			PaletteResult::Palleted {
-				first,
-				min_delta,
-				palette,
-				data,
-			} => {
-				assert_eq!(*first, 200);
-				assert_eq!(*min_delta, 0);
-				assert_eq!(palette, &[]);
-				assert_eq!(data, &[0; 24]);
-			},
+		let mut data = vec![0; 100 * 100 * 2];
+		for (i, v) in data.chunks_exact_mut(2).take(10).enumerate() {
+			let value = (i as u16).to_le_bytes();
+			v.copy_from_slice(&value);
 		}
+		let orig = data.clone();
 
-		let decompressed = decode_palette(compressed);
-		assert_eq!(decompressed.first, 200);
-		assert_eq!(decompressed.min_delta, 0);
-		assert_eq!(decompressed.deltas_from_minimum, vec![0; 24]);
-	}
+		let len = transform_palette(&mut data).unwrap();
+		assert_eq!(data[0], 9);
+		assert_eq!(data[1..3], [1, 0]);
+		assert_eq!(data[3..5], [1, 0]);
+		assert_eq!(data[5..7], [1, 0]);
+		assert_eq!(data[7..9], [1, 0]);
+		assert_eq!(data[9..11], [1, 0]);
+		assert_eq!(data[11..13], [1, 0]);
+		assert_eq!(data[13..15], [1, 0]);
+		assert_eq!(data[15..17], [1, 0]);
+		assert_eq!(data[17..19], [1, 0]);
+		assert_eq!(data[19], 0);
+		assert_eq!(data[20], 1);
+		assert_eq!(data[21], 2);
+		assert_eq!(data[22], 3);
+		assert_eq!(data[23], 4);
+		assert_eq!(data[24], 5);
+		assert_eq!(data[25], 6);
+		assert_eq!(data[26], 7);
+		assert_eq!(data[27], 8);
+		assert_eq!(data[28], 9);
+		assert_eq!(data[29], 0);
+		assert_eq!(len, 1 + 9 * 2 + 100 * 100);
 
-	#[test]
-	fn random_palette() {
-		let values = vec![
-			69, 420, 47, 24, 37, 14, 108, 1645, 29, 74, 36, 197, 978, 1000, 999, 1, 0, 60, 20, 13, 8, 4, 265, 76, 23,
-		];
-
-		let compressed = transform_prediction(Heightmap {
-			width: 5,
-			height: 5,
-			data: Cow::Borrowed(&values),
-		})
-		.unwrap();
-		let compressed = transform_palette(compressed);
-		let decompressed = decode_palette(compressed);
-		let decompressed = decode_prediction(decompressed, 5, 5);
-		assert_eq!(decompressed.data, values);
+		let mut out = vec![0; 100 * 100 * 2];
+		decode_palette(&mut data[..len], &mut out);
+		assert_eq!(orig, out);
 	}
 }

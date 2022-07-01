@@ -2,8 +2,12 @@ use std::{io, io::Read};
 
 use zstd::Decoder;
 
-use crate::{byte_compress::byte_decompress, palette::decode_palette, prediction::decode_prediction, Heightmap};
-use crate::byte_compress::u16_slice_to_u8_slice_mut;
+use crate::{
+	byte_compress::{byte_decompress, u16_slice_to_u8_slice_mut},
+	palette::decode_palette,
+	prediction::decode_prediction,
+	Heightmap,
+};
 
 pub fn decode(data: &[u8], width: u32, height: u32) -> Result<(Heightmap, usize), io::Error> {
 	let pixel_count = width as usize * height as usize;
@@ -27,8 +31,8 @@ pub fn decode(data: &[u8], width: u32, height: u32) -> Result<(Heightmap, usize)
 			decode_prediction(out, width, height)
 		}
 	} else {
-		let palette_len = data[5] as usize;
-		if data.len() == 5 + palette_len * 2 + pixel_count {
+		let palette_len = data[4] as usize;
+		if data.len() == 4 + palette_len * 2 + pixel_count {
 			unsafe {
 				std::ptr::copy_nonoverlapping(data.as_ptr(), out.as_mut_ptr() as _, 4);
 				decode_palette(&mut data[4..], u16_slice_to_u8_slice_mut(&mut out[2..]));
