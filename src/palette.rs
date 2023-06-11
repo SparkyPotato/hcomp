@@ -36,7 +36,7 @@ pub fn transform_palette(data: &mut [u8]) -> Option<usize> {
 	// Delta compress palette.
 	for i in (1..sorted.len()).rev() {
 		*map.get_mut(&sorted[i]).unwrap() = (i + 1) as u8;
-		sorted[i] -= sorted[i - 1];
+		sorted[i] -= sorted[i - 1] + 1;
 	}
 
 	let palette = sorted;
@@ -62,7 +62,7 @@ pub fn decode_palette(input: &mut [u8], out: &mut [u8]) {
 	for i in 1..len {
 		let prev = u16::from_le_bytes(palette[(i - 1) * 2..i * 2].try_into().unwrap());
 		let curr = u16::from_le_bytes(palette[i * 2..(i + 1) * 2].try_into().unwrap());
-		palette[i * 2..(i + 1) * 2].copy_from_slice(&(prev + curr).to_le_bytes());
+		palette[i * 2..(i + 1) * 2].copy_from_slice(&(prev + curr + 1).to_le_bytes());
 	}
 
 	let palette = &input[1..1 + len * 2];
@@ -90,14 +90,14 @@ mod tests {
 		let len = transform_palette(&mut data).unwrap();
 		assert_eq!(data[0], 9);
 		assert_eq!(data[1..3], [1, 0]);
-		assert_eq!(data[3..5], [1, 0]);
-		assert_eq!(data[5..7], [1, 0]);
-		assert_eq!(data[7..9], [1, 0]);
-		assert_eq!(data[9..11], [1, 0]);
-		assert_eq!(data[11..13], [1, 0]);
-		assert_eq!(data[13..15], [1, 0]);
-		assert_eq!(data[15..17], [1, 0]);
-		assert_eq!(data[17..19], [1, 0]);
+		assert_eq!(data[3..5], [0, 0]);
+		assert_eq!(data[5..7], [0, 0]);
+		assert_eq!(data[7..9], [0, 0]);
+		assert_eq!(data[9..11], [0, 0]);
+		assert_eq!(data[11..13], [0, 0]);
+		assert_eq!(data[13..15], [0, 0]);
+		assert_eq!(data[15..17], [0, 0]);
+		assert_eq!(data[17..19], [0, 0]);
 		assert_eq!(data[19], 0);
 		assert_eq!(data[20], 1);
 		assert_eq!(data[21], 2);
