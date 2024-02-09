@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-libwebp-sys = "0.6.0"
+libwebp-sys = "0.9.4"
 
 [workspace]
 members = [

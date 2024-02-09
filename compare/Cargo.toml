@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-libwebp-sys = "0.6.0"
+libwebp-sys = "0.9.4"
 png = "0.17.5"
 tiff = { git = "https://github.com/image-rs/image-tiff" }
 zstd = "0.11.2"
