@@ -7,7 +7,6 @@ edition = "2021"
 libwebp-sys = "0.6.0"
 png = "0.17.5"
 tiff = { git = "https://github.com/image-rs/image-tiff" }
-xz2 = "0.1.7"
 zstd = "0.11.2"
 
 hcomp = { path = ".." }

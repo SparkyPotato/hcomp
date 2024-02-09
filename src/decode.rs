@@ -1,58 +1,38 @@
-use std::{io, io::Read};
+use std::io;
 
-use zstd::Decoder;
+use libwebp_sys::WebPDecodeRGBAInto;
 
-use crate::{
-	byte_compress::{byte_decompress, u16_slice_to_u8_slice_mut},
-	palette::decode_palette,
-	prediction::decode_prediction,
-	Heightmap,
-};
+use crate::{prediction::decode_prediction, Heightmap};
 
 pub fn decode(data: &[u8], width: u32, height: u32) -> Result<(Heightmap, usize), io::Error> {
-	let pixel_count = width as usize * height as usize;
-
-	let (mut data, len) = decompress(data, pixel_count)?;
-
-	let u16_size = pixel_count * 2 + 2;
-	let u8_size = pixel_count + 3;
-
-	let mut out = vec![0; pixel_count + 1];
-
-	let ret = if data.len() == u16_size {
-		unsafe {
-			std::ptr::copy_nonoverlapping(data.as_ptr(), out.as_mut_ptr() as _, data.len());
-			decode_prediction(out, width, height)
-		}
-	} else if data.len() == u8_size {
-		unsafe {
-			std::ptr::copy_nonoverlapping(data.as_ptr(), out.as_mut_ptr() as _, 4);
-			byte_decompress(&data[4..], u16_slice_to_u8_slice_mut(&mut out[2..]));
-			decode_prediction(out, width, height)
-		}
-	} else {
-		let palette_len = data[4] as usize;
-		if data.len() == 4 + palette_len * 2 + pixel_count {
-			unsafe {
-				std::ptr::copy_nonoverlapping(data.as_ptr(), out.as_mut_ptr() as _, 4);
-				decode_palette(&mut data[4..], u16_slice_to_u8_slice_mut(&mut out[2..]));
-				decode_prediction(out, width, height)
-			}
-		} else {
-			return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid data length"));
-		}
-	};
-
+	let (data, len) = decompress_webp(data, width, height)?;
+	let ret = decode_prediction(data, width, height);
 	Ok((ret, len))
 }
 
-pub fn decompress(data: &[u8], pixel_count: usize) -> Result<(Vec<u8>, usize), io::Error> {
-	let mut out = Vec::with_capacity(pixel_count * 2 + 2);
-	let mut decoder = Decoder::with_buffer(data)?.single_frame();
-	decoder.include_magicbytes(false)?;
-	decoder.window_log_max(24)?;
-	decoder.read_to_end(&mut out)?;
-	let rest = decoder.finish();
-
-	Ok((out, data.len() - rest.len()))
+fn decompress_webp(data: &[u8], width: u32, height: u32) -> Result<(Vec<u16>, usize), io::Error> {
+	let mut decompressed: Vec<u16> = Vec::with_capacity(width as usize * height as usize + 1);
+	decompressed.push(u16::from_le_bytes(data[0..2].try_into().unwrap()));
+	let d = &data[2..];
+	unsafe {
+		let mut dec: Vec<u16> = Vec::with_capacity(width as usize * height as usize * 2);
+		if WebPDecodeRGBAInto(
+			d.as_ptr(),
+			d.len(),
+			dec.as_mut_ptr() as _,
+			dec.capacity() * 2,
+			width as i32 * 4,
+		)
+		.is_null()
+		{
+			panic!("WebPDecodeRGBAInto failed")
+		}
+		dec.set_len(dec.capacity());
+		decompressed.extend(dec.into_iter().step_by(2))
+	};
+	Ok((
+		decompressed,
+		u32::from_le_bytes(d[4..8].try_into().unwrap()) as usize + 10,
+	))
 }
+

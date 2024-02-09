@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::Duration};
+use std::{fmt::Display, ops::AddAssign, time::Duration};
 
 pub struct Size(usize);
 
@@ -54,6 +54,27 @@ impl Compression {
 			second: other,
 		}
 	}
+
+	pub fn named(name: &str) -> Self {
+		Self {
+			name: name.into(),
+			size: Size(0),
+			orig_size: Size(0),
+			compress: Time(0.0),
+			decompress: Time(0.0),
+			lossless: true,
+		}
+	}
+}
+
+impl AddAssign for Compression {
+	fn add_assign(&mut self, rhs: Self) {
+		self.size.0 += rhs.size.0;
+		self.orig_size.0 += rhs.orig_size.0;
+		self.compress.0 += rhs.compress.0;
+		self.decompress.0 += rhs.decompress.0;
+		self.lossless &= rhs.lossless;
+	}
 }
 
 impl Display for Compression {
@@ -95,3 +116,4 @@ impl Display for RelativeCompression<'_> {
 		)
 	}
 }
+

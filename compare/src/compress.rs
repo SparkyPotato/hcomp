@@ -14,14 +14,11 @@ use libwebp_sys::{
 	WebPPictureImportRGBA,
 	WebPPictureInit,
 };
-use xz2::write::{XzDecoder, XzEncoder};
 use zstd::{Decoder, Encoder};
 
 use crate::output::{Compression, Size, Time};
 
 pub fn hcomp(data: &[u16], width: u32, height: u32) -> Compression {
-	print!("hcomp: compressing");
-	std::io::stdout().flush().unwrap();
 	let start = Instant::now();
 	let mut compressed: Vec<u8> = Vec::new();
 	let compress_size = encode(
@@ -30,22 +27,17 @@ pub fn hcomp(data: &[u16], width: u32, height: u32) -> Compression {
 			height,
 			data: Cow::Borrowed(&data),
 		},
-		22,
 		&mut compressed,
 	)
 	.unwrap();
 	let compress_duration = start.elapsed();
 
-	print!("\rhcomp: decompressing");
-	std::io::stdout().flush().unwrap();
 	let start = Instant::now();
-	let (out, _) = decode(&compressed, width, height).unwrap();
+	let (out, len) = decode(&compressed, width, height).unwrap();
+	assert_eq!(len, compressed.len(), "Invalid length returned");
 	let decompress_duration = start.elapsed();
 
 	let lossless = out.data == data;
-
-	print!("\r");
-	std::io::stdout().flush().unwrap();
 
 	Compression {
 		name: "hcomp".into(),
@@ -58,8 +50,6 @@ pub fn hcomp(data: &[u16], width: u32, height: u32) -> Compression {
 }
 
 pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
-	print!("webp: compressing");
-	std::io::stdout().flush().unwrap();
 	let start = Instant::now();
 	let compressed = unsafe {
 		let mut temp: Vec<u8> = Vec::new();
@@ -99,8 +89,6 @@ pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
 	};
 	let compress_duration = start.elapsed();
 
-	print!("\rwebp: decompressing");
-	std::io::stdout().flush().unwrap();
 	let start = Instant::now();
 
 	let mut decompressed: Vec<u16> = Vec::with_capacity(width as usize * height as usize);
@@ -124,9 +112,6 @@ pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
 
 	let lossless = decompressed == data;
 
-	print!("\r");
-	std::io::stdout().flush().unwrap();
-
 	Compression {
 		name: "webp".into(),
 		size: Size::new(compressed.len()),
@@ -138,8 +123,6 @@ pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
 }
 
 pub fn zstd(data: &[u16]) -> Compression {
-	print!("zstd: compressing");
-	std::io::stdout().flush().unwrap();
 	let start = Instant::now();
 
 	let mut compressed = Vec::new();
@@ -152,8 +135,6 @@ pub fn zstd(data: &[u16]) -> Compression {
 
 	let compress_duration = start.elapsed();
 
-	print!("\rzstd: decompressing");
-	std::io::stdout().flush().unwrap();
 	let start = Instant::now();
 
 	let mut dec = Decoder::with_buffer(compressed.as_slice()).unwrap();
@@ -168,9 +149,6 @@ pub fn zstd(data: &[u16]) -> Compression {
 		.zip(data)
 		.all(|(d, &h)| h == u16::from_ne_bytes(d.try_into().unwrap()));
 
-	print!("\r");
-	std::io::stdout().flush().unwrap();
-
 	Compression {
 		name: "zstd".into(),
 		size: Size::new(compressed.len()),
@@ -181,41 +159,3 @@ pub fn zstd(data: &[u16]) -> Compression {
 	}
 }
 
-pub fn xz2(data: &[u16]) -> Compression {
-	print!("xz2: compressing");
-	std::io::stdout().flush().unwrap();
-	let start = Instant::now();
-	let mut compressed = Vec::new();
-	let mut enc = XzEncoder::new(&mut compressed, 9);
-	enc.write_all(unsafe { std::slice::from_raw_parts(data.as_ptr() as _, data.len() * 2) })
-		.unwrap();
-	enc.finish().unwrap();
-	let compress_duration = start.elapsed();
-
-	print!("\rxz2: decompressing");
-	std::io::stdout().flush().unwrap();
-	let start = Instant::now();
-	let mut out = Vec::with_capacity(data.len());
-	let mut dec = XzDecoder::new(&mut out);
-	dec.write_all(&compressed).unwrap();
-	dec.finish().unwrap();
-	drop(dec);
-	let decompress_duration = start.elapsed();
-
-	let lossless = out
-		.chunks_exact(2)
-		.zip(data)
-		.all(|(d, &h)| h == u16::from_ne_bytes(d.try_into().unwrap()));
-
-	print!("\r");
-	std::io::stdout().flush().unwrap();
-
-	Compression {
-		name: "lzma".into(),
-		size: Size::new(compressed.len()),
-		compress: Time::new(compress_duration),
-		decompress: Time::new(decompress_duration),
-		lossless,
-		orig_size: Size::new(data.len() * 2),
-	}
-}

@@ -177,3 +177,4 @@ mod tests {
 		assert_eq!(decompressed.data, values);
 	}
 }
+

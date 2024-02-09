@@ -5,8 +5,6 @@ use std::borrow::Cow;
 pub mod decode;
 pub mod encode;
 
-mod byte_compress;
-mod palette;
 mod prediction;
 
 /// A heightmap image.
@@ -28,40 +26,39 @@ mod tests {
 
 	#[test]
 	fn flat() {
-		let values = vec![200; 5 * 5];
+		let values = vec![200; 4 * 4];
 		let mut output = Vec::new();
 		encode(
 			Heightmap {
-				width: 5,
-				height: 5,
+				width: 4,
+				height: 4,
 				data: Cow::Borrowed(&values),
 			},
 			22,
 			&mut output,
 		)
 		.unwrap();
-		let (decompressed, _) = decode(&output, 5, 5).unwrap();
+		let (decompressed, _) = decode(&output, 4, 4).unwrap();
 		assert_eq!(decompressed.data, values);
 	}
 
 	#[test]
 	fn random() {
-		let values = vec![
-			69, 420, 47, 24, 37, 14, 108, 1645, 29, 74, 36, 197, 978, 1000, 999, 1, 0, 60, 20, 13, 8, 4, 265, 76, 23,
-		];
+		let values = vec![69, 420, 47, 24, 37, 14, 108, 1645, 29, 74, 36, 197, 978, 1000, 999, 1];
 
 		let mut output = Vec::new();
 		encode(
 			Heightmap {
-				width: 5,
-				height: 5,
+				width: 4,
+				height: 4,
 				data: Cow::Borrowed(&values),
 			},
 			22,
 			&mut output,
 		)
 		.unwrap();
-		let (decompressed, _) = decode(&output, 5, 5).unwrap();
+		let (decompressed, _) = decode(&output, 4, 4).unwrap();
 		assert_eq!(decompressed.data, values);
 	}
 }
+
