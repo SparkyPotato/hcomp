@@ -51,8 +51,14 @@ pub fn hcomp(data: &[u16], width: u32, height: u32) -> Compression {
 
 pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
 	let start = Instant::now();
+	let mut remapped = Vec::with_capacity(width as usize * height as usize * 2);
 	let compressed = unsafe {
 		let mut temp: Vec<u8> = Vec::new();
+
+		for &d in data {
+			remapped.push(d);
+			remapped.push(0);
+		}
 
 		let mut config = std::mem::zeroed();
 		WebPInitConfig(&mut config);
@@ -67,10 +73,10 @@ pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
 		picture.use_argb = 1;
 		picture.writer = Some(write);
 		picture.custom_ptr = &mut temp as *mut _ as _;
-		picture.width = width as i32 / 2;
+		picture.width = width as i32;
 		picture.height = height as i32;
 
-		WebPPictureImportRGBA(&mut picture, data.as_ptr() as _, width as i32 * 2);
+		WebPPictureImportRGBA(&mut picture, remapped.as_ptr() as _, width as i32 * 4);
 
 		WebPEncode(&config, &mut picture);
 
@@ -91,16 +97,13 @@ pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
 
 	let start = Instant::now();
 
-	let mut decompressed: Vec<u16> = Vec::with_capacity(width as usize * height as usize);
-	decompressed.resize(decompressed.capacity(), 0);
-
 	unsafe {
 		if WebPDecodeRGBAInto(
 			compressed.as_ptr(),
 			compressed.len(),
-			decompressed.as_mut_ptr() as _,
-			decompressed.len() * 2,
-			width as i32 * 2,
+			remapped.as_mut_ptr() as _,
+			remapped.len() * 2,
+			width as i32 * 4,
 		)
 		.is_null()
 		{
@@ -108,9 +111,11 @@ pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
 		}
 	};
 
+	let mapped: Vec<_> = remapped.into_iter().step_by(2).collect();
+
 	let decompress_duration = start.elapsed();
 
-	let lossless = decompressed == data;
+	let lossless = mapped == data;
 
 	Compression {
 		name: "webp".into(),

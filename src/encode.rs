@@ -11,7 +11,7 @@ use libwebp_sys::{
 
 use crate::{prediction::transform_prediction, Heightmap};
 
-/// Encode a heightmap. `compression_level` should be between -7 and 22, inclusive.
+/// Encode a heightmap.
 pub fn encode(heightmap: Heightmap, output: &mut impl Write) -> Result<usize, io::Error> {
 	assert!(
 		heightmap.width > 2 && heightmap.height > 2,
