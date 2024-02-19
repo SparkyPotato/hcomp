@@ -10,6 +10,8 @@ pub fn decode(data: &[u8], width: u32, height: u32) -> Result<(Heightmap, usize)
 	Ok((ret, len))
 }
 
+fn compressed_len(data: &[u8]) -> u32 { u32::from_le_bytes(data[6..10].try_into().unwrap()) + 10 }
+
 fn decompress_webp(data: &[u8], width: u32, height: u32) -> Result<(Vec<u16>, usize), io::Error> {
 	let mut decompressed: Vec<u16> = Vec::with_capacity(width as usize * height as usize + 1);
 	decompressed.push(u16::from_le_bytes(data[0..2].try_into().unwrap()));
@@ -30,9 +32,6 @@ fn decompress_webp(data: &[u8], width: u32, height: u32) -> Result<(Vec<u16>, us
 		dec.set_len(dec.capacity());
 		decompressed.extend(dec.into_iter().step_by(2))
 	};
-	Ok((
-		decompressed,
-		u32::from_le_bytes(d[4..8].try_into().unwrap()) as usize + 10,
-	))
+	Ok((decompressed, compressed_len(data) as usize))
 }
 
