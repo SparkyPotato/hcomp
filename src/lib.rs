@@ -34,7 +34,6 @@ mod tests {
 				height: 4,
 				data: Cow::Borrowed(&values),
 			},
-			22,
 			&mut output,
 		)
 		.unwrap();
@@ -53,7 +52,6 @@ mod tests {
 				height: 4,
 				data: Cow::Borrowed(&values),
 			},
-			22,
 			&mut output,
 		)
 		.unwrap();
