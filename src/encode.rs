@@ -5,6 +5,7 @@ use libwebp_sys::{
 	WebPImageHint::WEBP_HINT_GRAPH,
 	WebPInitConfig,
 	WebPPicture,
+	WebPPictureFree,
 	WebPPictureImportRGBA,
 	WebPPictureInit,
 };
@@ -71,6 +72,8 @@ fn compress_webp<T: Write>(data: &[u16], width: u32, height: u32, output: &mut T
 			c.b += data_size;
 			1
 		}
+
+		WebPPictureFree(&mut picture);
 
 		Ok(c.b)
 	}
