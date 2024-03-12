@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-libwebp-sys = { version = "0.9.4", features = ["avx2", "neon", "sse41"] }
+libwebp-sys = { version = "0.9", features = ["avx2", "neon", "sse41"] }
+image = "0.24"
+rustdct = "0.7"
+zstd = "0.13"
 
 [workspace]
 members = [

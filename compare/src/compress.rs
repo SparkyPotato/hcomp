@@ -4,7 +4,7 @@ use std::{
 	time::Instant,
 };
 
-use hcomp::{decode::decode, encode::encode, Heightmap};
+use hcomp::{decode, encode, Heightmap};
 use libwebp_sys::{
 	WebPDecodeRGBAInto,
 	WebPEncode,
@@ -31,13 +31,19 @@ pub fn hcomp(data: &[u16], width: u32, height: u32) -> Compression {
 	)
 	.unwrap();
 	let compress_duration = start.elapsed();
+	assert_eq!(compress_size, compressed.len(), "Invalid length returned");
 
 	let start = Instant::now();
 	let (out, len) = decode(&compressed, width, height).unwrap();
-	assert_eq!(len, compressed.len(), "Invalid length returned");
+	assert_eq!(len, compress_size, "Invalid length returned");
 	let decompress_duration = start.elapsed();
 
 	let lossless = out.data == data;
+
+	let n = 3600 * 449 + 350;
+	println!("\n{:?}", &out.data[n..][..100] == &data[n..][..100]);
+	println!("{:?}", &out.data[n..][..100]);
+	println!("{:?}", &data[n..][..100]);
 
 	Compression {
 		name: "hcomp".into(),
@@ -49,16 +55,15 @@ pub fn hcomp(data: &[u16], width: u32, height: u32) -> Compression {
 	}
 }
 
-pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
-	let start = Instant::now();
+fn webp_compress(data: &[u16], width: u32, height: u32) -> (Vec<u8>, Vec<u16>) {
 	let mut remapped = Vec::with_capacity(width as usize * height as usize * 2);
+	for &d in data {
+		remapped.push(d);
+		remapped.push(0);
+	}
+
 	let compressed = unsafe {
 		let mut temp: Vec<u8> = Vec::new();
-
-		for &d in data {
-			remapped.push(d);
-			remapped.push(0);
-		}
 
 		let mut config = std::mem::zeroed();
 		WebPInitConfig(&mut config);
@@ -93,10 +98,16 @@ pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
 
 		temp
 	};
+
+	(compressed, remapped)
+}
+
+pub fn webp(data: &[u16], width: u32, height: u32) -> Compression {
+	let start = Instant::now();
+	let (compressed, mut remapped) = webp_compress(data, width, height);
 	let compress_duration = start.elapsed();
 
 	let start = Instant::now();
-
 	unsafe {
 		if WebPDecodeRGBAInto(
 			compressed.as_ptr(),

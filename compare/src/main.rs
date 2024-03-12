@@ -17,8 +17,8 @@ fn main() {
 	let mut size = 0;
 	let mut disk_size = 0;
 	let mut hcomp_ = Compression::named("hcomp");
-	let mut webp_ = Compression::named("webp");
-	let mut zstd_ = Compression::named("zstd");
+	// let mut webp_ = Compression::named("webp");
+	// let mut zstd_ = Compression::named("zstd");
 
 	let count = std::env::args().skip(1).count();
 	for (i, path) in std::env::args().skip(1).enumerate() {
@@ -48,19 +48,27 @@ fn main() {
 		std::io::stdout().flush().unwrap();
 		hcomp_ += hcomp(&data, width, height);
 
-		print!("\r{} / {}: webp", i + 1, count);
-		std::io::stdout().flush().unwrap();
-		webp_ += webp(&data, width, height);
-
-		print!("\r{} / {}: zstd", i + 1, count);
-		std::io::stdout().flush().unwrap();
-		zstd_ += zstd(&data);
+		// print!("\r{} / {}: hcomp (delta 2x)", i + 1, count);
+		// std::io::stdout().flush().unwrap();
+		// hcomp_delta_2 += hcomp_delta(&data, width, height, 2);
+		//
+		// print!("\r{} / {}: hcomp (delta 4x)", i + 1, count);
+		// std::io::stdout().flush().unwrap();
+		// hcomp_delta_4 += hcomp_delta(&data, width, height, 4);
+		//
+		// print!("\r{} / {}: webp", i + 1, count);
+		// std::io::stdout().flush().unwrap();
+		// webp_ += webp(&data, width, height);
+		//
+		// print!("\r{} / {}: zstd", i + 1, count);
+		// std::io::stdout().flush().unwrap();
+		// zstd_ += zstd(&data);
 	}
 
 	println!("\rraw size: {}", Size::new(size));
 	println!("size on disk: {}\n", Size::new(disk_size));
 	println!("{}", hcomp_);
-	println!("{}\n{}", webp_, webp_.relative_to(&hcomp_));
-	println!("{}\n{}", zstd_, zstd_.relative_to(&hcomp_));
+	// println!("{}\n{}", webp_, webp_.relative_to(&hcomp_));
+	// println!("{}\n{}", zstd_, zstd_.relative_to(&hcomp_));
 }
 
